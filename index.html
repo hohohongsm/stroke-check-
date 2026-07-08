@@ -374,14 +374,63 @@ function StrokeDiagnosisApp() {
     })();
   }, [stage]);
   const downloadPNG = () => {
-    const W = 1080, H = 1320, pad = 70;
+    const W = 1080, pad = 70;
+    const fontStack = "'Pretendard','Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif";
+    const maxWidth = W - pad * 2;
+    const result = interpretation(scores);
+    const dateStr = (/* @__PURE__ */ new Date()).toLocaleDateString("ko-KR");
+    const meas = document.createElement("canvas").getContext("2d");
+    const wrap = (text, fontSpec) => {
+      meas.font = fontSpec;
+      const lines = [];
+      let line = "";
+      for (const ch of text) {
+        if (ch === "\n") {
+          lines.push(line);
+          line = "";
+          continue;
+        }
+        if (meas.measureText(line + ch).width > maxWidth) {
+          lines.push(line);
+          line = ch;
+        } else line += ch;
+      }
+      if (line) lines.push(line);
+      return lines;
+    };
+    const BODY = `400 23px ${fontStack}`, LH = 36, HEAD = `700 28px ${fontStack}`;
+    const blocks = [];
+    blocks.push({ title: "\uC885\uD569 \uD310\uC815", lines: wrap(result.summary, BODY), gapAfter: 30 });
+    if (revealed) {
+      blocks.push({ title: "\uC601\uC5ED\uBCC4 \uC0C1\uC138 \uD574\uC11D", lines: [], gapAfter: 6, headOnly: true });
+      SECTIONS.forEach((s) => {
+        const head = `${s.key} ${s.label.split(" (")[0]} \xB7 ${scores[s.key]}\uC810 (${level(scores[s.key], s.key)})`;
+        blocks.push({ subhead: head, color: s.color, lines: wrap(areaText(s.key, scores[s.key]), BODY), gapAfter: 20 });
+      });
+      if (result.patterns.length > 0) {
+        blocks.push({ title: "\uC870\uD569\uC73C\uB85C \uC77D\uAE30", lines: [], gapAfter: 6, headOnly: true });
+        result.patterns.forEach((p) => blocks.push({ lines: wrap(p, BODY), gapAfter: 16, band: "#FDF6F5" }));
+      }
+      blocks.push({ title: "\uC774\uBC88 \uC8FC \uC2E4\uCC9C \uC81C\uC548", lines: [], gapAfter: 6, headOnly: true });
+      result.actions.forEach((a2) => blocks.push({ lines: wrap(a2, BODY), gapAfter: 16, band: "#FFF9EF" }));
+    }
+    const headerH = pad + 130;
+    const chartH = 560 + 100;
+    let bodyH = 40;
+    for (const b of blocks) {
+      if (b.title) bodyH += 44;
+      if (b.subhead) bodyH += 34;
+      bodyH += b.lines.length * LH + (b.gapAfter || 0);
+    }
+    const footerH = 80;
+    const H = Math.ceil(headerH + chartH + bodyH + footerH);
     const cv = document.createElement("canvas");
     cv.width = W;
     cv.height = H;
     const ctx = cv.getContext("2d");
-    const fontStack = "'Pretendard','Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif";
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "left";
     ctx.fillStyle = ACCENT;
     ctx.font = `700 22px ${fontStack}`;
     ctx.fillText("STROKE SELF-CHECK", pad, pad + 10);
@@ -390,22 +439,21 @@ function StrokeDiagnosisApp() {
     ctx.fillText("\uB098\uC758 \uC2A4\uD2B8\uB85C\uD06C \uD504\uB85C\uD544", pad, pad + 66);
     ctx.fillStyle = "#7A8580";
     ctx.font = `400 24px ${fontStack}`;
-    const dateStr = (/* @__PURE__ */ new Date()).toLocaleDateString("ko-KR");
     ctx.fillText(`${nick ? nick + " \xB7 " : ""}${dateStr}`, pad, pad + 106);
-    const gx = pad, gy = pad + 150, gw = W - pad * 2, gh = 560;
+    const gx = pad, gy = headerH + 20, gw = W - pad * 2, gh = 560;
     const colW = gw / 5, rowH = gh / 10;
     ctx.strokeStyle = LINE;
     ctx.lineWidth = 1.5;
     ctx.font = `400 22px ${fontStack}`;
     for (let i = 0; i <= 10; i++) {
-      const y = gy + i * rowH;
+      const y2 = gy + i * rowH;
       ctx.beginPath();
-      ctx.moveTo(gx, y);
-      ctx.lineTo(gx + gw, y);
+      ctx.moveTo(gx, y2);
+      ctx.lineTo(gx + gw, y2);
       ctx.stroke();
       ctx.fillStyle = "#7A8580";
       ctx.textAlign = "right";
-      ctx.fillText(String(10 - i), gx - 14, y + 8);
+      ctx.fillText(String(10 - i), gx - 14, y2 + 8);
     }
     for (let i = 0; i <= 5; i++) {
       const x = gx + i * colW;
@@ -431,30 +479,39 @@ function StrokeDiagnosisApp() {
       ctx.font = `400 19px ${fontStack}`;
       ctx.fillText(s.label.split(" (")[0], gx + i * colW + colW / 2, gy + gh + 76);
     });
-    const { summary } = interpretation(scores);
     ctx.textAlign = "left";
-    ctx.fillStyle = INK;
-    ctx.font = `700 28px ${fontStack}`;
-    ctx.fillText("\uC885\uD569 \uD310\uC815", pad, gy + gh + 140);
-    ctx.font = `400 23px ${fontStack}`;
-    ctx.fillStyle = "#3E4A52";
-    const maxWidth = W - pad * 2;
-    let line = "", ty = gy + gh + 182;
-    for (const ch of summary) {
-      if (ctx.measureText(line + ch).width > maxWidth) {
-        ctx.fillText(line, pad, ty);
-        ty += 36;
-        line = ch;
-        if (ty > H - 90) {
-          line += "\u2026";
-          break;
+    let y = gy + gh + 130;
+    for (const b of blocks) {
+      if (b.title) {
+        ctx.fillStyle = INK;
+        ctx.font = HEAD;
+        ctx.fillText(b.title, pad, y);
+        y += 44;
+      }
+      if (b.subhead) {
+        ctx.fillStyle = b.color || INK;
+        ctx.font = `700 24px ${fontStack}`;
+        ctx.fillText(b.subhead, pad, y);
+        y += 34;
+      }
+      if (b.lines.length > 0) {
+        if (b.band) {
+          const boxH = b.lines.length * LH + 20;
+          ctx.fillStyle = b.band;
+          ctx.fillRect(pad - 16, y - 26, maxWidth + 32, boxH);
         }
-      } else line += ch;
+        ctx.fillStyle = "#3E4A52";
+        ctx.font = BODY;
+        for (const ln of b.lines) {
+          ctx.fillText(ln, pad, y);
+          y += LH;
+        }
+      }
+      y += b.gapAfter || 0;
     }
-    if (ty <= H - 90) ctx.fillText(line, pad, ty);
     ctx.fillStyle = "#9AA5A0";
     ctx.font = `400 18px ${fontStack}`;
-    ctx.fillText("\uBCF8 \uC9C4\uB2E8\uC740 \uC2A4\uD2B8\uB85C\uD06C \uAC1C\uB150\uC5D0 \uAE30\uBC18\uD55C \uC790\uAC00 \uC131\uCC30 \uB3C4\uAD6C\uC774\uBA70, \uD45C\uC900\uD654\uB41C \uC2EC\uB9AC\uAC80\uC0AC\uAC00 \uC544\uB2D9\uB2C8\uB2E4.", pad, H - 44);
+    ctx.fillText("\uBCF8 \uC9C4\uB2E8\uC740 \uC2A4\uD2B8\uB85C\uD06C \uAC1C\uB150\uC5D0 \uAE30\uBC18\uD55C \uC790\uAC00 \uC131\uCC30 \uB3C4\uAD6C\uC774\uBA70, \uD45C\uC900\uD654\uB41C \uC2EC\uB9AC\uAC80\uC0AC\uAC00 \uC544\uB2D9\uB2C8\uB2E4.", pad, H - 34);
     const a = document.createElement("a");
     a.download = `\uC2A4\uD2B8\uB85C\uD06C\uC9C4\uB2E8_${sanitize(nick) || "\uACB0\uACFC"}_${dateStr.replace(/\. ?/g, "")}.png`;
     a.href = cv.toDataURL("image/png");
@@ -650,7 +707,7 @@ function StrokeDiagnosisApp() {
         onClick: downloadPNG,
         style: { ...font, width: "100%", padding: "15px", fontSize: 15, fontWeight: 700, color: "#fff", background: INK, border: "none", borderRadius: 12, cursor: "pointer", marginBottom: 10 }
       },
-      "\uACB0\uACFC \uC774\uBBF8\uC9C0(PNG)\uB85C \uC800\uC7A5"
+      revealed ? "\uACB0\uACFC \uC774\uBBF8\uC9C0(PNG)\uB85C \uC800\uC7A5" : "\uADF8\uB798\uD504 \uC774\uBBF8\uC9C0(PNG)\uB85C \uC800\uC7A5"
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
