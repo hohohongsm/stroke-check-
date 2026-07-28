@@ -283,6 +283,7 @@ function StrokeDiagnosisApp() {
   const [code, setCode] = useState("");
   const [nick, setNick] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
+  const [dupPrompt, setDupPrompt] = useState(false);
   const [adminPw, setAdminPw] = useState("");
   const [adminCode, setAdminCode] = useState("");
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -357,12 +358,26 @@ function StrokeDiagnosisApp() {
     }
     setAdminLoading(false);
   };
+  const proceedToQuiz = () => {
+    setDupPrompt(false);
+    setStage("quiz");
+  };
   const validateAndStart = async () => {
     setStarting(true);
     setIntroError("");
     try {
       const r = await api("validate", { code: sanitize(code) });
-      if (r.valid) {
+      const list = r.valid ? [{ code: sanitize(code) }] : [];
+      if (list.some((x) => x.code === sanitize(code))) {
+        try {
+          const dup = await api("checkNick", { code: sanitize(code), nick: sanitize(nick) });
+          if (dup && dup.exists) {
+            setDupPrompt(true);
+            setStarting(false);
+            return;
+          }
+        } catch (e) {
+        }
         setStage("quiz");
       } else {
         setIntroError("\uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC9C4\uB2E8\uCF54\uB4DC\uC785\uB2C8\uB2E4. \uC9C4\uD589\uC790\uC5D0\uAC8C \uC548\uB0B4\uBC1B\uC740 \uCF54\uB4DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
@@ -608,7 +623,21 @@ function StrokeDiagnosisApp() {
         style: { ...font, width: "100%", padding: "16px", fontSize: 16, fontWeight: 700, color: "#fff", background: code.trim() && nick.trim() && !starting ? ACCENT : "#B9C4BF", border: "none", borderRadius: 12, cursor: code.trim() && nick.trim() && !starting ? "pointer" : "not-allowed" }
       },
       starting ? "\uCF54\uB4DC \uD655\uC778 \uC911\u2026" : "\uC9C4\uB2E8 \uC2DC\uC791\uD558\uAE30"
-    ), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement(
+    ), dupPrompt && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(30,42,50,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 16, padding: "26px 24px", maxWidth: 340, width: "100%", boxShadow: "0 8px 30px rgba(30,42,50,0.25)" } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 15.5, fontWeight: 700, color: INK, margin: "0 0 10px", lineHeight: 1.5 } }, "'", nick.trim(), "'\uB2D8\uC740 \uC774\uBBF8 \uCC38\uC5EC\uD55C \uAE30\uB85D\uC774 \uC788\uC5B4\uC694."), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13.5, color: "#5A6B6E", lineHeight: 1.65, margin: "0 0 20px" } }, "\uAC19\uC740 \uBD84\uC774 \uB2E4\uC2DC \uC9C4\uB2E8\uD558\uC2DC\uB294 \uAC70\uB77C\uBA74, \uC774\uC804 \uACB0\uACFC\uB294 \uC774\uBC88 \uACB0\uACFC\uB85C \uBC14\uB01D\uB2C8\uB2E4. \uB9CC\uC57D \uB2E4\uB978 \uBD84\uC774\uB77C\uBA74, \uB2C9\uB124\uC784 \uB4A4\uC5D0 \uAD6C\uBD84\uC744 \uBD99\uC5EC \uC8FC\uC138\uC694 (\uC608: ", nick.trim(), "2)."), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: proceedToQuiz,
+        style: { ...font, width: "100%", padding: "14px", fontSize: 15, fontWeight: 700, color: "#fff", background: ACCENT, border: "none", borderRadius: 10, cursor: "pointer", marginBottom: 10 }
+      },
+      "\uB2E4\uC2DC \uC9C4\uB2E8\uD558\uAE30 (\uC774\uC804 \uACB0\uACFC\uB294 \uBC14\uB01D\uB2C8\uB2E4)"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setDupPrompt(false),
+        style: { ...font, width: "100%", padding: "14px", fontSize: 15, fontWeight: 600, color: INK, background: "#fff", border: `1.5px solid ${LINE}`, borderRadius: 10, cursor: "pointer" }
+      },
+      "\uB2E4\uB978 \uC0AC\uB78C\uC774\uC5D0\uC694 (\uB2C9\uB124\uC784 \uBC14\uAFB8\uAE30)"
+    ))), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
